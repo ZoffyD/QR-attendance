@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Attendance</title><link rel="stylesheet" href="/static/style.css">
+<body class="auth">
+<!-- Kept simple: one card in the middle; the school's crest and name are the backdrop. -->
+<main class="auth-stage">
+ <div class="auth-backdrop" aria-hidden="true">
+  <img class="auth-crest" data-school-logo alt="">
+  <div class="auth-marquee top"><span data-school="name"></span><span data-school="name"></span><span data-school="name"></span><span data-school="name"></span></div>
+  <div class="auth-marquee bottom"><span data-school="motto"></span><span data-school="motto"></span><span data-school="motto"></span><span data-school="motto"></span></div>
+ </div>
+ <div class="auth-card">
+  <div class="auth-brand"><img data-school-logo alt="School crest"><div><b data-school="name"></b><small data-school="motto"></small></div></div>
+  <p class="auth-portal"><span class="logo" aria-hidden="true"></span><span>QR Attendance · <span id="portalName"></span></span></p>
+  <h2 class="auth-title" id="title">Log in</h2>
+  <form id="f" class="form">
+   <div><label for="u" id="ulabel">Username</label><input id="u" autocomplete="username" autocapitalize="none" required></div>
+   <div><label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required></div>
+   <button>Log in &rarr;</button>
+   <div id="msg" class="msg" role="alert"></div>
+  </form>
+  <p class="links"><a id="forgot">Forgot password?</a><a id="reg" hidden></a></p>
+ </div>
+</main>
+<script src="/static/app.js"></script>
+<script>
+// The portal comes from the address: /student, /teacher or /admin. Each has its own colour theme.
+const role = PORTAL;
+document.title = `QR Attendance · ${ROLE_NAME[role]} portal`;
+$("#portalName").textContent = ROLE_NAME[role] + " portal";
+$("#title").textContent = `${ROLE_NAME[role]} log in`;
+$("#forgot").href = `/${role}/forgot`;
+if (role !== "admin") { $("#ulabel").textContent = role === "student" ? "Student ID" : "Teacher ID"; $("#u").setAttribute("autocapitalize", "characters");
+  const a = $("#reg"); a.hidden = false; a.href = `/${role}/register`; a.textContent = "First time? Register"; }
+(async () => { if (auth.token) try { const me = await api("/api/me"); if (me.role === role) location.href = HOME[role]; } catch (e) { auth.clear(); } })();
+$("#f").onsubmit = async e => {
+  e.preventDefault();
+  try { const r = await api("/api/login", { method: "POST", body: { username: $("#u").value.trim(), password: $("#p").value, role } });
+    auth.save(r); location.href = HOME[r.role]; }
+  catch (err) { say($("#msg"), err.message + (role !== "admin" && err.status === 401 ? " If you have not registered yet, press “First time? Register”." : ""), "err"); }
+};
+</script></html>

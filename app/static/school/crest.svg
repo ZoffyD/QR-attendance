@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" role="img" aria-label="School crest (placeholder)">
+  <!-- Placeholder crest drawn for this project. Replace this file with the school's real logo. -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6DE9C"/><stop offset="1" stop-color="#C9A24F"/>
+    </linearGradient>
+    <linearGradient id="navy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1F3F78"/><stop offset="1" stop-color="#0E2147"/>
+    </linearGradient>
+  </defs>
+  <!-- shield -->
+  <path d="M100 8 L188 34 V110 C188 168 150 206 100 232 C50 206 12 168 12 110 V34 Z" fill="url(#gold)"/>
+  <path d="M100 20 L176 42 V110 C176 160 143 194 100 218 C57 194 24 160 24 110 V42 Z" fill="url(#navy)"/>
+  <!-- star -->
+  <path d="M100 40 l7.6 15.4 17 2.5 -12.3 12 2.9 16.9 -15.2 -8 -15.2 8 2.9 -16.9 -12.3 -12 17 -2.5 z" fill="url(#gold)"/>
+  <!-- open book -->
+  <path d="M46 112 C66 104 86 106 98 116 V160 C86 150 66 148 46 156 Z" fill="#F4F1E8"/>
+  <path d="M154 112 C134 104 114 106 102 116 V160 C114 150 134 148 154 156 Z" fill="#F4F1E8"/>
+  <path d="M56 122 C70 118 82 119 90 124 M56 132 C70 128 82 129 90 134 M56 142 C70 138 82 139 90 144
+           M144 122 C130 118 118 119 110 124 M144 132 C130 128 118 129 110 134 M144 142 C130 138 118 139 110 144"
+        stroke="#1F3F78" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <!-- ribbon -->
+  <path d="M30 172 H170 L160 186 L170 200 H30 L40 186 Z" fill="url(#gold)"/>
+  <text x="100" y="192" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="800"
+        letter-spacing="3" fill="#0E2147">SMKTH</text>
+</svg>

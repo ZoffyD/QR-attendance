@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Attendance · Register</title><link rel="stylesheet" href="/static/style.css">
+<body class="auth">
+<main class="auth-stage">
+ <div class="auth-backdrop" aria-hidden="true">
+  <img class="auth-crest" data-school-logo alt="">
+  <div class="auth-marquee top"><span data-school="name"></span><span data-school="name"></span><span data-school="name"></span><span data-school="name"></span></div>
+  <div class="auth-marquee bottom"><span data-school="motto"></span><span data-school="motto"></span><span data-school="motto"></span><span data-school="motto"></span></div>
+ </div>
+ <div class="auth-card">
+  <div class="auth-brand"><img data-school-logo alt="School crest"><div><b data-school="name"></b><small data-school="motto"></small></div></div>
+  <p class="auth-portal"><span class="logo" aria-hidden="true"></span><span>QR Attendance · <span id="portalName"></span></span></p>
+  <div id="student" hidden>
+   <h2 class="auth-title">Register</h2>
+   <p class="auth-lead">Enter your student ID and full name exactly as in the school's records. You register once and print your QR once.</p>
+   <form id="fs" class="form">
+    <div><label for="no">Student ID</label><input id="no" autocomplete="username" autocapitalize="characters" required></div>
+    <div><label for="nm">Full name</label><input id="nm" autocomplete="name" required></div>
+    <div><label for="pw">Create a password (8 or more characters)</label><input id="pw" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div><label for="pw2">Password again</label><input id="pw2" type="password" autocomplete="new-password" required></div>
+    <button id="gos">Register &rarr;</button>
+   </form>
+  </div>
+  <div id="teacher" hidden>
+   <h2 class="auth-title">Register</h2>
+   <p class="auth-lead">Enter your teacher ID and full name exactly as in the school's teacher list. Your position and co-curricula come from that list. Your email is used if you forget your password.</p>
+   <form id="ft" class="form">
+    <div><label for="tu">Teacher ID</label><input id="tu" autocomplete="username" autocapitalize="characters" required></div>
+    <div><label for="tn">Full name</label><input id="tn" autocomplete="name" required></div>
+    <div><label for="te">Email</label><input id="te" type="email" autocomplete="email" required></div>
+    <div><label for="tp">Create a password (8 or more characters)</label><input id="tp" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div><label for="tp2">Password again</label><input id="tp2" type="password" autocomplete="new-password" required></div>
+    <button id="got">Register &rarr;</button>
+   </form>
+  </div>
+  <div id="msg" class="msg" role="alert"></div>
+  <p class="links"><a id="back" href="/">Already have an account? Log in</a></p>
+ </div>
+</main>
+<script src="/static/app.js"></script>
+<script>
+const role = PORTAL === "teacher" ? "teacher" : "student";
+$("#" + role).hidden = false; $("#back").href = "/" + role;
+$("#portalName").textContent = ROLE_NAME[role] + " portal";
+$("#fs").onsubmit = async e => {
+  e.preventDefault();
+  if ($("#pw").value !== $("#pw2").value) return say($("#msg"), "The two passwords are not the same.", "err");
+  $("#gos").disabled = true;
+  try { const r = await api("/api/register/student", { method: "POST", body: { student_no: $("#no").value.trim(), name: $("#nm").value.trim(), password: $("#pw").value } });
+    auth.save(r); location.href = HOME.student; }
+  catch (err) { say($("#msg"), err.message, "err"); $("#gos").disabled = false; }
+};
+$("#ft").onsubmit = async e => {
+  e.preventDefault();
+  if ($("#tp").value !== $("#tp2").value) return say($("#msg"), "The two passwords are not the same.", "err");
+  $("#got").disabled = true;
+  try { const r = await api("/api/register/teacher", { method: "POST", body: { teacher_no: $("#tu").value.trim(), name: $("#tn").value.trim(), email: $("#te").value.trim(), password: $("#tp").value } });
+    auth.save(r); location.href = HOME.teacher; }
+  catch (err) { say($("#msg"), err.message, "err"); $("#got").disabled = false; }
+};
+</script></html>

@@ -1,0 +1,417 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Attendance · Teacher</title><link rel="stylesheet" href="/static/style.css">
+<style>
+/* the scan result: one big line in the colour of the outcome, with the student's photo to check it is them */
+#result{min-height:200px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;margin:16px 0;padding:24px;
+  text-align:center;color:var(--dim);border:2px dashed var(--line2);border-radius:12px;background:var(--soft)}
+#result .big{font-size:clamp(1.6rem,4.4vw,2.8rem);font-weight:800;line-height:1.1;letter-spacing:-.02em;overflow-wrap:anywhere;color:var(--ink)}
+#result .avatar{width:96px;height:96px;font-size:32px}
+#result.ok,#result.warn,#result.bad{border-style:solid;animation:pop .35s ease-out}
+#result.ok{border-color:var(--ok);background:var(--okbg)}#result.ok .big{color:var(--ok)}
+#result.warn{border-color:#D49B1D;background:var(--warnbg)}#result.warn .big{color:var(--amber)}
+#result.bad{border-color:var(--bad);background:var(--badbg)}#result.bad .big{color:var(--bad)}
+#reader{max-width:400px;margin:0 auto;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+#ssinfo{font-size:15px;margin:6px 0 4px;color:var(--dim)}
+.card .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.card .btns .btn,.card .btns button{padding:8px 12px;font-size:12px}
+</style>
+<body>
+<header><h1><img data-school-logo alt=""><span><span data-school="name"></span><small>Teacher portal</small></span></h1>
+ <div class="hdr-user" id="whoami"></div>
+ <div class="hdr-actions"><button class="ghost" id="cpwBtn">Change password</button><button class="ghost" id="logout">Log out</button></div></header>
+<main>
+<nav class="tabbar" id="nav" aria-label="Pages"></nav>
+
+<!-- ============ profile (home) ============ -->
+<div id="tab-profile" hidden>
+<section>
+ <div class="profile-card">
+  <div><div id="pphoto"></div>
+   <div class="photo-tools"><button class="ghost" id="photoBtn">Upload photo</button><button class="ghost" id="photoDel" hidden>Remove</button></div></div>
+  <div class="who">
+   <p class="page-label">Teacher profile</p>
+   <h2 class="name" id="pname"></h2>
+   <p class="sub" id="psub"></p>
+   <dl class="profile"><dt>Teacher ID</dt><dd id="pno"></dd><dt>Position</dt><dd id="ppos"></dd><dt>Email</dt><dd id="pemail"></dd></dl>
+  </div>
+ </div>
+ <div id="phmsg" class="msg" role="status"></div>
+</section>
+<section><h2>Co-curricula you are in charge of</h2>
+ <p class="note">Set by the school's teacher list. You can only create sessions, scan, see reports and record achievements for these. If one is missing or wrong, ask the admin.</p>
+ <div class="cards" id="mycocu"></div>
+</section>
+</div>
+
+<!-- ============ calendar ============ -->
+<section id="tab-calendar" hidden></section>
+
+<!-- ============ my students ============ -->
+<section id="tab-students" hidden><h2>My students</h2>
+ <p class="note">Students of the co-curricula you are in charge of. <b>Reset code</b>: for a student who forgot their password. <b>Terminate QR</b>: the QR is lost; the student registers again.</p>
+ <div id="studentList"></div>
+</section>
+
+<!-- ============ achievements ============ -->
+<div id="tab-achievements" hidden>
+<section><h2>Record an achievement</h2>
+ <p class="note">For a member of one of your co-curricula. It appears on the student's profile.</p>
+ <div class="row">
+  <div><label for="acls">Co-curriculum</label><select id="acls"></select></div>
+  <div><label for="astu">Student</label><select id="astu"></select></div>
+ </div>
+ <div class="row" style="margin-top:12px">
+  <div style="max-width:120px"><label for="ayr">Year</label><input id="ayr" type="number" min="1990" max="2100"></div>
+  <div><label for="alv">Level</label><select id="alv"><option>School</option><option>Zone</option><option>District</option><option>State</option><option>National</option><option>International</option></select></div>
+  <div><label for="aaw">Award</label><input id="aaw" placeholder="e.g. Champion, Gold, 3rd place" autocomplete="off"></div>
+  <div class="fit"><button id="aadd">Record</button></div>
+ </div>
+ <div id="amsg" class="msg" role="status"></div>
+</section>
+<section><h2>Achievements in your co-curricula</h2>
+ <div class="scroll"><table><thead><tr><th>Year</th><th>Student</th><th>Class ID</th><th>Co-curriculum</th><th>Level</th><th>Award</th><th>Recorded by</th><th></th></tr></thead><tbody id="alist"></tbody></table></div>
+</section>
+</div>
+
+<!-- ============ reports ============ -->
+<div id="tab-reports" hidden>
+<section><h2>Attendance reports</h2>
+ <div class="row">
+  <div><label for="rcls">Co-curriculum</label><select id="rcls"></select></div>
+  <div><label for="rfrom">From</label><input id="rfrom" type="date"></div>
+  <div><label for="rto">To</label><input id="rto" type="date"></div>
+  <div><label for="rlow">Highlight below</label><select id="rlow"><option value="50">50%</option><option value="75" selected>75%</option><option value="80">80%</option><option value="90">90%</option></select></div>
+ </div>
+ <p class="note">Only your own co-curricula. Only sessions that have already happened count. Students who have not registered yet have no QR, so they are listed but left out of the percentages.</p>
+ <div id="rmsg" class="msg" role="status"></div>
+</section>
+<div id="rout"></div>
+</div>
+
+<!-- ============ one co-curriculum ============ -->
+<div id="vClass" hidden>
+<p class="crumb"><a href="#profile">&larr; My profile</a></p>
+<section><div class="row"><h2 id="ctitle" class="big grow"></h2><div class="fit"><button id="cnewsess">+ New session</button></div><div class="fit"><button id="creport" class="ghost">Report</button></div></div>
+ <p id="ctype"></p>
+ <h3>Teachers in charge</h3>
+ <div id="cteachers" class="chips"></div>
+</section>
+<section><h2>Sessions</h2>
+ <div class="scroll"><table><thead><tr><th>Date</th><th>Time</th><th>Session</th><th>Venue</th><th>Taking part</th><th>Present</th><th></th></tr></thead><tbody id="csessions"></tbody></table></div>
+</section>
+<section><h2>Members</h2>
+ <p class="note">From the school's master list. To change them, the admin updates the master list.</p>
+ <p id="ccount" class="note"></p>
+ <div class="scroll"><table><thead><tr><th></th><th>Name</th><th>Student ID</th><th>Class ID</th><th>Account</th></tr></thead><tbody id="cstu"></tbody></table></div>
+</section>
+</div>
+
+<!-- ============ create / edit a session ============ -->
+<section id="vForm" hidden>
+ <p class="crumb"><a href="javascript:history.back()">&larr; Back</a></p>
+ <h2 id="ftitle">New session</h2>
+ <div class="row">
+  <div><label for="stitle">Title</label><input id="stitle" placeholder="e.g. Weekly practice"></div>
+  <div><label for="svenue">Venue</label><input id="svenue" placeholder="e.g. Dewan Utama, or Hall A / Hall B for a split class"></div>
+ </div>
+ <div class="row" style="margin-top:12px">
+  <div><label for="sdate">Date</label><input id="sdate" type="date"></div>
+  <div><label for="sstart">Start time</label><input id="sstart" type="time"></div>
+  <div><label for="send">End time</label><input id="send" type="time"></div>
+ </div>
+ <h3>Co-curriculum</h3>
+ <p class="note">Only the co-curricula you are in charge of are listed. Tick several for a joint session; their other teachers in charge see it too and can scan into the same list.</p>
+ <p class="note"><b>Split class</b> (one co-curriculum in two halls at the same time): create <b>one</b> session with every hall in the venue, e.g. <i>Hall A / Hall B</i>. Each teacher opens it on their own device and picks <b>My venue</b> before scanning. A second session at the same time is refused.</p>
+ <div id="sclasses" class="checks"></div>
+ <div class="row" style="margin-top:12px"><div class="fit"><button id="ssave">Save session</button></div></div>
+ <div id="fmsg" class="msg" role="alert"></div>
+</section>
+
+<!-- ============ one session: scanner + attendance ============ -->
+<div id="vSession" hidden>
+<p class="crumb"><a href="#calendar">&larr; Calendar</a></p>
+<section>
+ <div class="row"><h2 id="sstitle" class="big grow"></h2>
+  <div class="fit"><button id="editBtn" class="ghost">Edit / reschedule</button></div>
+  <div class="fit"><button id="closeBtn" class="ghost"></button></div>
+  <div class="fit"><button id="csvBtn" class="ghost">Export CSV</button></div>
+  <div class="fit"><button id="sdel" class="danger-ghost">Delete</button></div></div>
+ <p id="ssinfo"></p><p id="ssteach" class="note"></p>
+</section>
+<section><h2>Scan student QR</h2>
+ <div class="row" style="margin-bottom:12px">
+  <div><label for="myvenue">My venue (where you are scanning)</label><input id="myvenue" list="venues" autocomplete="off" placeholder="e.g. Hall A"><datalist id="venues"></datalist></div>
+ </div>
+ <div class="row">
+  <div class="fit"><button id="camBtn">Start camera</button></div>
+  <div><label for="code" class="sr">USB scanner or type the code</label><input id="code" placeholder="USB scanner: click here and scan" autocomplete="off"></div>
+ </div>
+ <div id="reader" hidden></div>
+ <div id="result" role="status" aria-live="assertive"><div class="big">Ready to scan</div><div>Start the camera or use a USB scanner</div></div>
+ <div class="stats"><div><b id="np">0</b>present</div><div><b id="na">0</b>absent</div><div><b id="nu">0</b>not registered yet</div></div>
+ <p class="note">Only members of this session's co-curricula can check in; anyone else is refused and nothing is recorded. A wrong check-in can be undone for <span id="undoMin">10</span> minutes. This list updates by itself, so scans by other teachers appear here too.</p>
+ <div id="attmsg" class="msg" role="status"></div>
+ <div class="scroll"><table><thead><tr><th></th><th>Name</th><th>Student ID</th><th>Class ID</th><th>Co-curriculum</th><th>Status</th><th>Checked in</th><th>Venue</th><th>Scanned by</th><th></th></tr></thead><tbody id="att"></tbody></table></div>
+</section>
+</div>
+</main>
+<script src="/static/app.js"></script><script src="/static/vendor/html5-qrcode.min.js"></script>
+<script>
+let me = null, prof = null, cls = null, sess = null, editing = null, qr = null, last = { code: "", at: 0 }, poll = null, cal = null, stuList = null;
+const TABS = [["profile", "Profile"], ["calendar", "Calendar"], ["students", "My students"], ["achievements", "Achievements"], ["reports", "Reports"]];
+const VIEWS = ["tab-profile", "tab-calendar", "tab-students", "tab-achievements", "tab-reports", "vClass", "vForm", "vSession"];
+const PARENT = { vClass: "profile", vForm: "calendar", vSession: "calendar" };
+function show(id) {
+  VIEWS.forEach(v => $("#" + v).hidden = v !== id);
+  tabBar($("#nav"), TABS, PARENT[id] || id.replace("tab-", ""), k => location.hash = k);
+}
+
+async function route() {
+  stopCamera(); clearInterval(poll);
+  const [path, query] = location.hash.slice(1).split("?"), [kind, id] = path.split("/"), q = new URLSearchParams(query || "");
+  try {
+    if (kind === "class" && id) { show("vClass"); await loadClass(+id); }
+    else if (kind === "session" && id) { show("vSession"); sess = null; await loadSession(+id); poll = setInterval(() => loadSession(+id, true), 5000); }
+    else if (kind === "new") { show("vForm"); await openForm(null, q.get("date"), q.get("class")); }
+    else if (kind === "edit" && id) { show("vForm"); await openForm(+id); }
+    else if (kind === "calendar") { show("tab-calendar"); cal ? cal.reload() : (cal = calendar($("#tab-calendar"), { onOpen: s => location.hash = "session/" + s.id, onNew: d => location.hash = "new?date=" + d })); }
+    else if (kind === "students") { show("tab-students"); stuList ? stuList.reload() : (stuList = studentList($("#studentList"))); }
+    else if (kind === "achievements") { show("tab-achievements"); await loadAch(); }
+    else if (kind === "reports") { show("tab-reports"); await openReports(q.get("class")); }
+    else { show("tab-profile"); await loadProfile(); }
+  } catch (e) { alert(e.message); if (e.status === 404) location.hash = "profile"; }
+}
+addEventListener("hashchange", route);
+
+// ---------------- profile
+async function loadProfile() {
+  prof = await api("/api/teacher/me");
+  $("#pphoto").replaceChildren(avatar(prof, "lg"));
+  $("#photoBtn").textContent = prof.has_photo ? "Change photo" : "Upload photo"; $("#photoDel").hidden = !prof.has_photo;
+  $("#pname").textContent = prof.name; $("#psub").textContent = prof.position || "Teacher";
+  $("#pno").textContent = prof.teacher_no; $("#ppos").textContent = prof.position || "—"; $("#pemail").textContent = prof.email || "—";
+  $("#mycocu").replaceChildren(...(prof.cocurricula.length ? prof.cocurricula.map(c => h("div", { class: "card" },
+    h("div", { class: "k" }, CAT[c.category] || "Group"), h("div", { class: "v" }, c.name),
+    h("div", { class: "d" }, `${c.students} members · ${c.registered} registered · ${c.sessions} sessions`),
+    c.co_teachers ? h("div", { class: "d" }, "With " + c.co_teachers) : "",
+    h("div", { class: "btns" }, h("a", { class: "btn ghost", href: "#class/" + c.id }, "Open"), h("a", { class: "btn", href: "#new?class=" + c.id }, "+ New session"))))
+    : [h("p", { class: "note" }, "You are not in charge of any co-curriculum yet. The admin sets this in the school's teacher list.")]));
+}
+async function changedPhoto(err) {
+  if (err) return say($("#phmsg"), err.message, "err");
+  forgetPhoto(prof.id); say($("#phmsg"), "Photo saved.", "ok"); await loadProfile(); setupHeader(await api("/api/me"));
+}
+$("#photoBtn").onclick = () => choosePhoto(changedPhoto);
+$("#photoDel").onclick = async () => { if (!confirm("Remove your photo?")) return; await api("/api/me/photo", { method: "DELETE" }); changedPhoto(null); };
+
+// ---------------- one co-curriculum (view only: members come from the master list)
+async function loadClass(id) {
+  cls = await api(`/api/classes/${id}`);
+  $("#ctitle").textContent = cls.name; $("#ctype").replaceChildren(catPill(cls.category));
+  $("#cteachers").replaceChildren(...cls.teachers.map(t => h("span", { class: "chip" }, t.name, t.position ? h("span", { class: "note" }, " · " + t.position) : "")));
+  $("#csessions").replaceChildren(...(cls.sessions.length ? cls.sessions.map(s => h("tr", {}, h("td", { class: "num" }, fmtDate(s.session_date)), h("td", { class: "num" }, timeRange(s)),
+    h("td", {}, h("a", { href: "#session/" + s.id }, s.title)), h("td", {}, s.venue), h("td", { class: "small" }, s.classes), h("td", { class: "num" }, String(s.present)),
+    h("td", {}, h("a", { href: "#session/" + s.id, class: "btn" }, s.closed ? "View" : "Scan")))) : [empty(7, "No sessions yet. Press + New session.")]));
+  const reg = cls.students.filter(s => s.qr_status !== "unregistered").length;
+  $("#ccount").textContent = `${cls.students.length} members · ${reg} registered · ${cls.students.length - reg} not registered yet`;
+  $("#cstu").replaceChildren(...(cls.students.length ? cls.students.map(s => h("tr", {}, h("td", {}, avatar(s)), h("td", {}, s.name), h("td", {}, s.student_no), h("td", {}, s.class_name),
+    h("td", {}, QR_LABEL(s)))) : [empty(5, "No members on the master list yet.")]));
+}
+$("#cnewsess").onclick = () => location.hash = "new?class=" + cls.id;
+$("#creport").onclick = () => location.hash = "reports?class=" + cls.id;
+
+// ---------------- achievements
+let achClasses = [];
+async function loadAch() {
+  achClasses = await api("/api/classes");
+  if (!$("#ayr").value) $("#ayr").value = new Date().getFullYear();
+  const keep = $("#acls").value;
+  $("#acls").replaceChildren(...(achClasses.length ? achClasses.map(c => h("option", { value: c.id }, c.name)) : [h("option", { value: "" }, "You are not in charge of any co-curriculum")]));
+  if (achClasses.some(c => String(c.id) === keep)) $("#acls").value = keep;
+  await loadAchStudents();
+  const list = await api("/api/achievements");
+  $("#alist").replaceChildren(...(list.length ? list.map(a => h("tr", {}, h("td", { class: "num" }, String(a.year)), h("td", {}, a.name, h("div", { class: "note" }, a.student_no)),
+    h("td", {}, a.class_name), h("td", {}, a.activity), h("td", {}, levelPill(a.level)), h("td", {}, h("b", {}, a.award)), h("td", { class: "small" }, a.added_by || ""),
+    h("td", {}, h("button", { class: "ghost", onclick: async () => { if (!confirm(`Remove ${a.award} (${a.activity}, ${a.year}) from ${a.name}?`)) return;
+      try { await api(`/api/achievements/${a.id}`, { method: "DELETE" }); loadAch(); } catch (e) { say($("#amsg"), e.message, "err"); } } }, "Remove"))))
+    : [empty(8, "No achievements recorded for your co-curricula yet.")]));
+}
+async function loadAchStudents() {
+  const cid = $("#acls").value; if (!cid) return $("#astu").replaceChildren();
+  const c = await api(`/api/classes/${cid}`);
+  $("#astu").replaceChildren(...(c.students.length ? c.students.map(s => h("option", { value: s.id }, `${s.name} (${s.student_no}, ${s.class_name})`)) : [h("option", { value: "" }, "No members")]));
+}
+$("#acls").onchange = loadAchStudents;
+$("#aadd").onclick = async () => {
+  if (!$("#astu").value) return say($("#amsg"), "Choose a student.", "err");
+  try { await api("/api/achievements", { method: "POST", body: { class_id: +$("#acls").value, student_id: +$("#astu").value, year: +$("#ayr").value,
+      level: $("#alv").value, award: $("#aaw").value.trim() } });
+    say($("#amsg"), "Achievement recorded.", "ok"); $("#aaw").value = ""; loadAch(); }
+  catch (e) { say($("#amsg"), e.message, "err"); }
+};
+
+// ---------------- reports (own co-curricula only)
+let reportReady = false;
+async function openReports(classId) {
+  if (!reportReady) {
+    const t = new Date(); $("#rfrom").value = `${t.getFullYear()}-01-01`; $("#rto").value = isoDate(t);
+    ["#rcls", "#rfrom", "#rto", "#rlow"].forEach(s => $(s).onchange = renderReport); reportReady = true;
+  }
+  const list = await api("/api/classes"), keep = classId || $("#rcls").value;
+  $("#rcls").replaceChildren(h("option", { value: "" }, "All mine (summary)"), ...list.map(c => h("option", { value: c.id }, c.name)));
+  $("#rcls").value = list.some(c => String(c.id) === String(keep)) ? keep : "";
+  await renderReport();
+}
+async function renderReport() {
+  const cid = $("#rcls").value, low = +$("#rlow").value, qs = `start=${$("#rfrom").value}&end=${$("#rto").value}`;
+  say($("#rmsg"), "");
+  let r;
+  try { r = await api(cid ? `/api/reports/classes/${cid}?${qs}` : `/api/reports/classes?${qs}`); }
+  catch (e) { $("#rout").replaceChildren(); return say($("#rmsg"), e.message, "err"); }
+  const range = `${fmtDate(r.start)} – ${fmtDate(r.end)}`;
+  if (!cid) {
+    $("#rout").replaceChildren(h("section", {}, h("h2", {}, "Summary"), h("p", { class: "note" }, range),
+      h("div", { class: "scroll" }, h("table", {}, h("thead", {}, h("tr", {}, ["Co-curriculum", "Type", "Members", "Sessions held", "Attendance", ""].map(x => h("th", {}, x)))),
+        h("tbody", {}, r.classes.length ? r.classes.map(c => h("tr", { class: c.percent != null && c.percent < low ? "low" : "" },
+          h("td", {}, h("b", {}, c.name)), h("td", {}, catPill(c.category)),
+          h("td", { class: "num" }, String(c.students), c.unregistered ? h("span", { class: "note" }, ` (+${c.unregistered} not registered)`) : ""),
+          h("td", { class: "num" }, String(c.sessions)), h("td", {}, bar(c.percent, low)),
+          h("td", {}, h("button", { class: "ghost", onclick: () => { $("#rcls").value = c.id; renderReport(); } }, "View"))))
+          : [empty(6, "Nothing yet.")])))));
+    return;
+  }
+  const below = r.students.filter(s => s.percent != null && s.percent < low);
+  const stats = h("div", { class: "stats" }, ...[[r.sessions.length, "sessions held"], [r.counted, "registered students"],
+    [r.percent == null ? "–" : Math.round(r.percent) + "%", "average attendance"], [below.length, `below ${low}%`], [r.unregistered, "not registered yet"]]
+    .map(([v, k]) => h("div", {}, h("b", {}, String(v)), k)));
+  let sortLow = false;
+  const tbody = h("tbody");
+  const drawStudents = () => {
+    const rows = [...r.students].sort((a, b) => sortLow ? (a.percent ?? 101) - (b.percent ?? 101) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
+    tbody.replaceChildren(...(rows.length ? rows.map(s => h("tr", { class: s.percent != null && s.percent < low ? "low" : "" },
+      h("td", {}, s.name), h("td", {}, s.student_no), h("td", {}, s.class_name), h("td", { class: "num" }, s.registered ? `${s.attended} / ${r.sessions.length}` : "–"),
+      h("td", {}, s.registered ? bar(s.percent, low) : pill("warn", "not registered yet")), h("td", { class: "small" }, s.last_seen ? fmtDateTime(s.last_seen) : "never")))
+      : [empty(6, "No students.")]));
+  };
+  drawStudents();
+  $("#rout").replaceChildren(
+    h("section", {}, h("div", { class: "row" }, h("h2", { class: "big grow" }, r.name, " ", catPill(r.category)),
+        h("div", { class: "fit" }, h("label", { class: "inline" }, h("input", { type: "checkbox", onchange: e => { sortLow = e.target.checked; drawStudents(); } }), " Lowest first")),
+        h("div", { class: "fit" }, h("button", { class: "ghost", onclick: async () => download(await api(`/api/reports/classes/${cid}/export.csv?${qs}`, { blob: true }),
+          `attendance-${r.name}-${r.start}-${r.end}.csv`.replace(/[^\w.-]+/g, "_")) }, "Export CSV (Excel)"))),
+      h("p", { class: "note" }, range), stats,
+      h("div", { class: "scroll" }, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "Student ID", "Class ID", "Attended", "Attendance", "Last check-in"].map(x => h("th", {}, x)))), tbody))),
+    h("section", {}, h("h2", {}, "Sessions"),
+      h("div", { class: "scroll" }, h("table", {}, h("thead", {}, h("tr", {}, ["Date", "Time", "Session", "Venue", "Present", "Attendance"].map(x => h("th", {}, x)))),
+        h("tbody", {}, r.sessions.length ? [...r.sessions].reverse().map(s => h("tr", {}, h("td", { class: "num" }, fmtDate(s.session_date)), h("td", { class: "num" }, timeRange(s)),
+          h("td", {}, h("a", { href: "#session/" + s.id }, s.title)), h("td", {}, s.venue), h("td", { class: "num" }, `${s.present} / ${r.counted}`), h("td", {}, bar(s.percent, low))))
+          : [empty(6, "No sessions in this period.")])))));
+}
+
+// ---------------- create / edit session: only the teacher's own co-curricula can be ticked
+async function openForm(id, date, classId) {
+  editing = id; say($("#fmsg"), "");
+  const classes = await api("/api/classes");
+  let s = { title: "", venue: "", session_date: date || isoDate(new Date()), start_time: "", end_time: "" }, chosen = new Set(classId ? [+classId] : []);
+  if (id) { const d = await api(`/api/sessions/${id}`); s = d.session; chosen = new Set(d.classes.map(c => c.id)); }
+  if (!id && !classId && classes.length === 1) chosen.add(classes[0].id);
+  $("#ftitle").textContent = id ? "Edit session" : "New session";
+  $("#stitle").value = s.title; $("#svenue").value = s.venue; $("#sdate").value = s.session_date; $("#sstart").value = s.start_time; $("#send").value = s.end_time;
+  $("#sclasses").replaceChildren(...(classes.length ? classes.map(c => h("label", { class: "check" }, h("input", { type: "checkbox", value: c.id, checked: chosen.has(c.id) }),
+    " ", c.name, " ", catPill(c.category), h("span", { class: "note" }, ` · ${c.students} members`)))
+    : [h("p", { class: "note" }, "You are not in charge of any co-curriculum yet, so you cannot create a session.")]));
+  $("#ssave").disabled = !classes.length;
+}
+$("#ssave").onclick = async () => {
+  const body = { title: $("#stitle").value.trim(), venue: $("#svenue").value.trim(), session_date: $("#sdate").value, start_time: $("#sstart").value, end_time: $("#send").value,
+    class_ids: [...$("#sclasses").querySelectorAll("input:checked")].map(i => +i.value) };
+  if (!body.title || !body.venue || !body.session_date) return say($("#fmsg"), "Enter a title, venue and date.", "err");
+  if (!body.class_ids.length) return say($("#fmsg"), "Tick at least one co-curriculum.", "err");
+  try {
+    if (editing) { await api(`/api/sessions/${editing}`, { method: "PUT", body }); location.hash = "session/" + editing; }
+    else { const r = await api("/api/sessions", { method: "POST", body }); location.hash = "session/" + r.id; }
+  } catch (e) {
+    say($("#fmsg"), e.message, "err");
+    // the co-curriculum already has a session at that time: offer to open it instead
+    if (e.data?.session_id) $("#fmsg").append(h("div", { style: "margin-top:10px" },
+      h("a", { class: "btn", href: "#session/" + e.data.session_id }, "Join that session instead")));
+  }
+};
+
+// ---------------- one session
+async function loadSession(id, quiet) {
+  const d = await api(`/api/sessions/${id}`); sess = { ...d.session, classes: d.classes };
+  $("#sstitle").textContent = sess.title; $("#undoMin").textContent = d.undo_minutes;
+  $("#ssinfo").replaceChildren(h("span", {}, h("b", {}, fmtDate(sess.session_date)), timeRange(sess) ? " · " + timeRange(sess) : "", " · ", sess.venue, " · ",
+    d.classes.map((c, i) => [i ? ", " : "", h("a", { href: "#class/" + c.id }, c.name)])));
+  $("#ssteach").textContent = "Teachers in charge: " + (d.teachers.join(", ") || "none yet");
+  $("#closeBtn").textContent = sess.closed ? "Reopen session" : "Close session";
+  $("#camBtn").disabled = $("#code").disabled = !!sess.closed;
+  $("#np").textContent = d.present; $("#na").textContent = d.absent; $("#nu").textContent = d.unregistered;
+  $("#att").replaceChildren(...(d.rows.length ? d.rows.map(r => h("tr", {}, h("td", {}, avatar(r, "", r.student_id)), h("td", {}, r.name), h("td", {}, r.student_no), h("td", {}, r.class_name), h("td", { class: "small" }, r.classes),
+    h("td", {}, r.checked_in_at ? pill("present", "present") : r.qr_status === "unregistered" ? pill("warn", "not registered yet") : pill("absent", "absent")),
+    h("td", {}, fmtTime(r.checked_in_at)), h("td", { class: "small" }, r.scan_venue || ""), h("td", {}, r.scanned_by || ""),
+    h("td", {}, r.can_undo ? h("button", { class: "danger-ghost", onclick: () => undo(r.student_id, r.name) }, "Undo") : "")))
+    : [empty(10, "No students taking part yet.")]));
+  if (!quiet) setupVenue();
+  if (!quiet) result(sess.closed ? "warn" : "", sess.closed ? "Session closed" : "Ready to scan", sess.closed ? "Reopen it to scan more students" : "Start the camera or use a USB scanner");
+}
+// "My venue": a split class lists its halls in the session venue ("Hall A / Hall B"); each teacher picks theirs.
+// It is remembered on this device for this session, and sent with every scan.
+const venueParts = () => (sess?.venue || "").split(/\s*\/\s*/).map(v => v.trim()).filter(Boolean);
+const venueKey = () => "venue:" + sess.id;
+function setupVenue() {
+  const parts = venueParts();
+  $("#venues").replaceChildren(...parts.map(v => h("option", { value: v })));
+  let saved = ""; try { saved = localStorage.getItem(venueKey()) || ""; } catch (e) {}
+  $("#myvenue").value = saved || (parts.length === 1 ? parts[0] : "");
+  $("#myvenue").disabled = !!sess.closed;
+}
+$("#myvenue").oninput = () => { try { localStorage.setItem(venueKey(), $("#myvenue").value.trim()); } catch (e) {} };
+async function undo(studentId, name) {
+  if (!confirm(`Undo the check-in of ${name}?`)) return;
+  try { await api(`/api/sessions/${sess.id}/attendance/${studentId}`, { method: "DELETE" }); say($("#attmsg"), `Check-in of ${name} undone.`, "ok"); loadSession(sess.id, true); }
+  catch (e) { say($("#attmsg"), e.message, "err"); }
+}
+// clearing the class and forcing a reflow restarts the pop animation, even for two successful scans in a row
+function result(kind, big, small, student) {
+  $("#result").className = ""; void $("#result").offsetWidth; $("#result").className = kind;
+  $("#result").replaceChildren(student ? avatar(student, "md") : "", h("div", { class: "big" }, big), h("div", {}, small || ""));
+}
+function beep(ok) { try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(c.destination); o.start(); o.stop(c.currentTime + (ok ? .12 : .4)); } catch (e) {} }
+async function submit(code) {
+  if (!sess) return;   // the session is still loading
+  const venue = $("#myvenue").value.trim();
+  if (!venue && venueParts().length > 1) { beep(false); $("#myvenue").focus();
+    return result("bad", "Choose your venue first", `This session is in ${venueParts().join(" and ")}. Pick where you are scanning under My venue.`); }
+  const now = Date.now(); if (code === last.code && now - last.at < 3000) return; last = { code, at: now };
+  try {
+    const r = await api(`/api/sessions/${sess.id}/scan`, { method: "POST", body: { code, venue } });
+    const st = r.student, who = st ? `${st.name} · ${st.student_no}${st.class_name ? " · " + st.class_name : ""}` : "";
+    if (r.status === "checked_in") result("ok", "Check-in successful", `${who} · ${fmtTime(r.time)} · ${r.venue}`, st);
+    else if (r.status === "already") result("warn", "Already checked in", `${who} · at ${fmtTime(r.time)}${r.venue ? " in " + r.venue : ""}${r.scanned_by ? ", scanned by " + r.scanned_by : ""}`, st);
+    else if (r.status === "not_enrolled") result("bad", "Student is not involved in this session", `${who} is not in ${sess.classes.map(c => c.name).join(", ")}. Nothing was recorded.`, st);
+    else result("bad", r.message, "");
+    beep(r.status === "checked_in");
+    if (r.status === "checked_in") loadSession(sess.id, true);
+  } catch (e) { result("bad", "Could not reach the server", e.message); beep(false); }
+}
+$("#code").addEventListener("keydown", e => { if (e.key === "Enter") { const v = e.target.value.trim(); e.target.value = ""; if (v) submit(v); } });
+$("#camBtn").onclick = () => qr ? stopCamera() : startCamera();
+async function startCamera() {
+  $("#reader").hidden = false; qr = new Html5Qrcode("reader"); $("#camBtn").textContent = "Stop camera";
+  try { await qr.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 240, height: 240 } }, submit, () => {}); }
+  catch (e) { stopCamera(); result("bad", "Camera unavailable", "Browsers allow the camera only on https:// addresses (or localhost), and you must allow camera access. You can still use a USB scanner."); }
+}
+function stopCamera() {
+  $("#camBtn").textContent = "Start camera"; $("#reader").hidden = true;
+  if (!qr) return; const q = qr; qr = null;
+  try { Promise.resolve(q.stop()).catch(() => {}).finally(() => { try { q.clear(); } catch (e) {} }); } catch (e) { /* camera never started */ }
+}
+$("#editBtn").onclick = () => location.hash = "edit/" + sess.id;
+$("#closeBtn").onclick = async () => { await api(`/api/sessions/${sess.id}/closed`, { method: "POST", body: { closed: !sess.closed } }); stopCamera(); loadSession(sess.id); };
+$("#csvBtn").onclick = async () => download(await api(`/api/sessions/${sess.id}/export.csv`, { blob: true }), `${sess.title}-${sess.session_date}.csv`.replace(/[^\w.-]+/g, "_"));
+$("#sdel").onclick = async () => { if (!confirm(`Delete session ${sess.title}? Its attendance records are deleted too.`)) return;
+  await api(`/api/sessions/${sess.id}`, { method: "DELETE" }); location.hash = "calendar"; };
+
+requireRole("teacher").then(m => { me = m; route(); });
+</script></html>

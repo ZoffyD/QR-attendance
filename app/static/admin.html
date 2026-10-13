@@ -1,0 +1,305 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Attendance · Admin</title><link rel="stylesheet" href="/static/style.css">
+<body>
+<!-- The admin uploads the school's master list (students and teachers) and views everything else.
+     Day-to-day work (sessions, scanning, achievements, student QR and passwords) is done by the teachers. -->
+<header><h1><img data-school-logo alt=""><span><span data-school="name"></span><small>Admin portal</small></span></h1>
+ <div class="hdr-user" id="whoami"></div>
+ <div class="hdr-actions"><button class="ghost" id="cpwBtn">Change password</button><button class="ghost" id="logout">Log out</button></div></header>
+<main>
+<nav class="tabbar" id="nav" aria-label="Pages"></nav>
+
+<!-- ============ overview ============ -->
+<div id="tab-overview" hidden>
+<section><h2>System overview</h2><div class="stats" id="stats"></div><div id="alerts"></div></section>
+<section id="backups"><div class="row"><h2 class="grow">Backups</h2><div class="fit"><button id="bnow" class="ghost">Back up now</button></div></div>
+ <p id="binfo" class="note"></p>
+ <div id="bmsg" class="msg" role="status"></div>
+ <details><summary>Backup files</summary>
+  <div class="scroll"><table><thead><tr><th>File</th><th>Made</th><th>Size</th><th></th></tr></thead><tbody id="blist"></tbody></table></div>
+  <p class="note">To restore: stop the server, copy the chosen file over <code>data/attendance.db</code>, and start the server again. Backups hold every student's data, so keep copies somewhere safe.</p>
+ </details>
+</section>
+</div>
+
+<!-- ============ master list: students | teachers ============ -->
+<div id="tab-master" hidden>
+<div class="subtabs" id="msub"><button data-k="students">Students</button><button data-k="teachers">Teachers</button></div>
+
+<div id="m-students">
+<section><h2>Upload the student list</h2>
+ <p class="note">A CSV file (Excel: <i>Save As → CSV UTF-8</i>) with this header row:<br>
+  <code>student_no,name,class_id,uniform_body,club_society,sport_game</code><br>for example <code>13255,Vicky Tan,4E1,Gadet Police,Pancaragam Harmonica,Basketball</code>.</p>
+ <ul class="note tight">
+  <li>Every student appears straight away, marked <i>not registered yet</i>. Students register once to get their QR.</li>
+  <li>Each co-curriculum is created the first time it appears, with these students as its members.</li>
+  <li>Uploading again (e.g. a new school year) updates names, class IDs and co-curricula. Accounts, QR codes and attendance stay. To correct a mistake, fix the spreadsheet and upload it again.</li>
+ </ul>
+ <div class="row"><div><label for="sfile">CSV file</label><input id="sfile" type="file" accept=".csv,text/csv"></div><div class="fit"><button id="simp">Upload</button></div></div>
+ <div id="simsg" class="msg" role="status"></div>
+</section>
+<section><h2>Students</h2>
+ <div class="row"><div><input id="sq" placeholder="Search student ID, name, class ID or co-curriculum" aria-label="Search students"></div>
+  <div class="fit"><label class="inline"><input type="checkbox" id="snot"> Only not registered yet</label></div></div>
+ <p id="scount" class="note"></p>
+ <div class="scroll"><table><thead><tr><th></th><th>Student ID</th><th>Name</th><th>Class ID</th><th>Uniform body</th><th>Club / society</th><th>Sport / game</th><th>Account</th></tr></thead><tbody id="slist"></tbody></table></div>
+</section>
+</div>
+
+<div id="m-teachers" hidden>
+<section><h2>Upload the teacher list</h2>
+ <p class="note">Upload the <b>student list first</b>, so the co-curricula exist. Then a CSV file with this header row:<br>
+  <code>teacher_id,name,position,email,co_curricula</code><br>for example <code>T001,Eren Yeager,Senior Assistant,eren@school.edu.my,Gadet Police; Basketball</code>.</p>
+ <ul class="note tight">
+  <li><b>co_curricula</b>: the co-curricula the teacher is in charge of, separated by <code>;</code>. The names must match the student list exactly. This is the only way a teacher is put in charge, so teachers cannot pick the wrong ones.</li>
+  <li><b>email</b> is optional: teachers give their own when they register. It is used for forgot password.</li>
+  <li>Teachers register once at <code id="tlink"></code> with their teacher ID and name.</li>
+ </ul>
+ <div class="row"><div><label for="tfile">CSV file</label><input id="tfile" type="file" accept=".csv,text/csv"></div><div class="fit"><button id="timp">Upload</button></div></div>
+ <div id="timsg" class="msg" role="status"></div>
+</section>
+<section><h2>Teachers</h2>
+ <div class="row"><div><input id="tq" placeholder="Search teacher ID, name, position or co-curriculum" aria-label="Search teachers"></div></div>
+ <p id="tcount" class="note"></p>
+ <div class="scroll"><table><thead><tr><th></th><th>Teacher ID</th><th>Name</th><th>Position</th><th>Email</th><th>In charge of</th><th>Account</th></tr></thead><tbody id="tlist"></tbody></table></div>
+</section>
+</div>
+</div>
+
+<!-- ============ co-curricula ============ -->
+<section id="tab-classes" hidden><h2>Co-curricula</h2>
+ <p class="note">From the master list: members from the student list, teachers in charge from the teacher list.</p>
+ <div class="scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Teachers in charge</th><th>Members</th><th>Sessions</th><th></th></tr></thead><tbody id="cls"></tbody></table></div>
+</section>
+
+<!-- ============ one co-curriculum (view only) ============ -->
+<div id="vClass" hidden>
+<p class="crumb"><a href="#classes">&larr; Co-curricula</a></p>
+<section><h2 id="ctitle" class="big"></h2><p id="ctype"></p>
+ <h3>Teachers in charge</h3><div id="cteachers" class="chips"></div>
+ <h3>Sessions</h3><p id="csessions" class="note"></p>
+</section>
+<section><h2>Members</h2><p id="ccount" class="note"></p>
+ <div class="scroll"><table><thead><tr><th></th><th>Name</th><th>Student ID</th><th>Class ID</th><th>Account</th></tr></thead><tbody id="cstu"></tbody></table></div>
+</section>
+</div>
+
+<!-- ============ achievements (view only) ============ -->
+<section id="tab-achievements" hidden><h2>Achievements</h2>
+ <p class="note">Recorded by the teachers in charge of each co-curriculum.</p>
+ <div class="row"><div><input id="aq" placeholder="Search student, activity, level or award" aria-label="Search achievements"></div></div>
+ <p id="acount" class="note"></p>
+ <div class="scroll"><table><thead><tr><th>Year</th><th>Student</th><th>Class ID</th><th>Activity</th><th>Level</th><th>Award</th><th>Recorded by</th></tr></thead><tbody id="alist"></tbody></table></div>
+</section>
+
+<!-- ============ report: overall only ============ -->
+<div id="tab-reports" hidden>
+<section><h2>Overall attendance</h2>
+ <div class="row">
+  <div><label for="rfrom">From</label><input id="rfrom" type="date"></div>
+  <div><label for="rto">To</label><input id="rto" type="date"></div>
+ </div>
+ <p class="note">Only sessions that have already happened count. Each teacher sees the student-by-student detail of their own co-curricula.</p>
+ <div id="rmsg" class="msg" role="status"></div>
+ <div class="stats" id="rstats"></div>
+</section>
+<section><h2>By co-curriculum</h2>
+ <div class="scroll"><table><thead><tr><th>Co-curriculum</th><th>Type</th><th>Teachers in charge</th><th>Members</th><th>Sessions held</th><th>Attendance</th></tr></thead><tbody id="rlist"></tbody></table></div>
+</section>
+</div>
+
+<!-- ============ activity log ============ -->
+<section id="tab-log" hidden><h2>Activity log</h2>
+ <p class="note">Who did what: uploads, registrations, sessions, check-ins and undos, achievements, terminated QRs, reset codes, exports and backups.</p>
+ <div class="row"><div><input id="lq" placeholder="Search name, action, co-curriculum or student" aria-label="Search the activity log"></div></div>
+ <div class="scroll"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th>About</th><th>Details</th></tr></thead><tbody id="log"></tbody></table></div>
+ <p><button id="lmore" class="ghost" hidden>Show older</button></p>
+</section>
+</main>
+<script src="/static/app.js"></script>
+<script>
+const TABS = [["overview", "Overview"], ["master", "Master list"], ["classes", "Co-curricula"], ["achievements", "Achievements"], ["reports", "Report"], ["log", "Activity log"]];
+const VIEWS = ["tab-overview", "tab-master", "tab-classes", "vClass", "tab-achievements", "tab-reports", "tab-log"];
+function show(id) {
+  VIEWS.forEach(v => $("#" + v).hidden = v !== id);
+  tabBar($("#nav"), TABS, id === "vClass" ? "classes" : id.replace("tab-", ""), k => location.hash = k);
+}
+async function route() {
+  const [kind, id] = location.hash.slice(1).split("/");
+  try {
+    if (kind === "master") { show("tab-master"); await openMaster(id === "teachers" ? "teachers" : "students"); }
+    else if (kind === "classes") { show("tab-classes"); await loadClasses(); }
+    else if (kind === "class" && id) { show("vClass"); await loadClass(+id); }
+    else if (kind === "achievements") { show("tab-achievements"); await loadAch(); }
+    else if (kind === "reports") { show("tab-reports"); await openReport(); }
+    else if (kind === "log") { show("tab-log"); await loadLog(); }
+    else { show("tab-overview"); await loadOverview(); }
+  } catch (e) { alert(e.message); }
+}
+addEventListener("hashchange", route);
+const ACCOUNT = m => m.qr_status === "unregistered" ? pill("warn", "not registered yet") : m.qr_status === "terminated" ? pill("absent", "QR terminated, must register again")
+  : !m.active ? pill("absent", "disabled") : pill("present", "registered");
+
+// ---------------- overview
+async function loadOverview() {
+  const o = await api("/api/admin/overview"), c = o.counts;
+  $("#stats").replaceChildren(...[["Students registered", `${c.students_registered} / ${c.students}`], ["Teachers registered", `${c.teachers_registered} / ${c.teachers}`],
+    ["Co-curricula", c.classes], ["Sessions", c.sessions], ["Check-ins", c.check_ins], ["Achievements", c.achievements]]
+    .map(([k, v]) => h("div", {}, h("b", {}, String(v)), k)));
+  $("#alerts").replaceChildren(
+    !c.students ? h("p", { class: "alert" }, "The student list is empty, so nobody can register yet. ", h("a", { href: "#master/students" }, "Upload it")) : "",
+    c.students && !c.teachers ? h("p", { class: "alert" }, "The teacher list is empty. ", h("a", { href: "#master/teachers" }, "Upload it")) : "",
+    c.no_teacher ? h("p", { class: "alert" }, `${c.no_teacher} co-curricula have no teacher in charge yet. Add them to the teacher list and upload it again. `, h("a", { href: "#classes" }, "See which")) : "");
+  const lastB = o.backup.last ? new Date(o.backup.last) : null;
+  if (!lastB || Date.now() - lastB > Math.max(o.backup.every_hours, 24) * 2 * 3600e3)
+    $("#alerts").append(h("p", { class: "alert" }, lastB ? `The last backup was on ${fmtDateTime(o.backup.last)}. ` : "There is no backup yet. ",
+      h("a", { href: "#", onclick: e => { e.preventDefault(); $("#bnow").click(); } }, "Back up now")));
+  loadBackups();
+}
+async function loadBackups() {
+  const b = await api("/api/admin/backups");
+  $("#binfo").replaceChildren(
+    b.every_hours > 0 ? `Automatic backup every ${b.every_hours} hours, keeping the newest ${b.keep}. ` : "Automatic backups are off (ATT_BACKUP_HOURS=0). ",
+    b.files.length ? h("span", {}, "Last backup: ", h("b", {}, fmtDateTime(b.files[0].created)), ". ") : "No backup yet. ",
+    h("br"), "Folder: ", h("code", { class: "path" }, b.dir),
+    b.copy_dir ? h("span", {}, h("br"), "Second copy: ", h("code", { class: "path" }, b.copy_dir)) : h("span", {}, h("br"),
+      "Tip: download a backup now and then, or set ATT_BACKUP_COPY_DIR to a second disk, so one broken disk cannot lose everything."));
+  $("#blist").replaceChildren(...(b.files.length ? b.files.slice(0, 15).map(f => h("tr", {}, h("td", { class: "small" }, f.name),
+    h("td", { class: "num" }, fmtDateTime(f.created)), h("td", { class: "num" }, fmtSize(f.size)),
+    h("td", {}, h("button", { class: "ghost", onclick: async () => download(await api(`/api/admin/backups/${encodeURIComponent(f.name)}`, { blob: true }), f.name) }, "Download"))))
+    : [empty(4, "No backups yet.")]));
+}
+$("#bnow").onclick = async () => {
+  $("#bnow").disabled = true;
+  try { const r = await api("/api/admin/backups", { method: "POST" });
+    say($("#bmsg"), `Backup saved: ${r.name}` + (r.copied ? " (and copied to the second folder)" : r.copy_error ? `. Copy to the second folder failed: ${r.copy_error}` : ""), r.copy_error ? "err" : "ok");
+    loadOverview(); }
+  catch (e) { say($("#bmsg"), e.message, "err"); } finally { $("#bnow").disabled = false; }
+};
+
+// ---------------- master list
+let students = [], teachers = [];
+async function openMaster(which) {
+  $("#msub").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.k === which); b.onclick = () => location.hash = "master/" + b.dataset.k; });
+  $("#m-students").hidden = which !== "students"; $("#m-teachers").hidden = which !== "teachers";
+  if (which === "students") { students = await api("/api/admin/master/students"); renderStudents(); }
+  else { $("#tlink").textContent = location.origin + "/teacher/register"; teachers = await api("/api/admin/master/teachers"); renderTeachers(); }
+}
+function renderStudents() {
+  const q = $("#sq").value.toLowerCase(), notReg = $("#snot").checked;
+  const rows = students.filter(m => [m.student_no, m.name, m.class_name, m.uniform, m.club, m.sport].join(" ").toLowerCase().includes(q) && (!notReg || m.qr_status === "unregistered"));
+  const reg = students.filter(m => m.qr_status !== "unregistered").length;
+  $("#scount").textContent = `${students.length} students · ${reg} registered · ${students.length - reg} not registered yet · showing ${Math.min(rows.length, 500)}`;
+  $("#slist").replaceChildren(...(rows.length ? rows.slice(0, 500).map(m => h("tr", {}, h("td", {}, avatar(m)), h("td", {}, m.student_no), h("td", {}, m.name), h("td", {}, m.class_name),
+    h("td", { class: "small" }, m.uniform || "–"), h("td", { class: "small" }, m.club || "–"), h("td", { class: "small" }, m.sport || "–"), h("td", {}, ACCOUNT(m))))
+    : [empty(8, students.length ? "No match." : "The list is empty. Upload the school's student CSV above.")]));
+}
+function renderTeachers() {
+  const q = $("#tq").value.toLowerCase();
+  const rows = teachers.filter(t => [t.teacher_no, t.name, t.position, t.email, t.classes].join(" ").toLowerCase().includes(q));
+  const reg = teachers.filter(t => t.qr_status !== "unregistered").length;
+  $("#tcount").textContent = `${teachers.length} teachers · ${reg} registered · ${teachers.length - reg} not registered yet`;
+  $("#tlist").replaceChildren(...(rows.length ? rows.map(t => h("tr", {}, h("td", {}, avatar(t)), h("td", {}, t.teacher_no), h("td", {}, t.name), h("td", {}, t.position || "–"),
+    h("td", { class: "small" }, t.email || "–"), h("td", { class: "small" }, t.classes || pill("warn", "nothing yet")), h("td", {}, ACCOUNT(t))))
+    : [empty(7, teachers.length ? "No match." : "The list is empty. Upload the school's teacher CSV above.")]));
+}
+$("#sq").oninput = renderStudents; $("#snot").onchange = renderStudents; $("#tq").oninput = renderTeachers;
+async function upload(file, url, msg, after) {
+  const f = $(file).files[0]; if (!f) return say($(msg), "Choose a CSV file first.", "err");
+  try { const r = await api(url, { method: "POST", body: { csv: await f.text() } });
+    $(msg).replaceChildren(`Uploaded: ${r.added} added, ${r.updated} updated` + (r.skipped ? `, ${r.skipped} rows skipped:` : "."),
+      ...(r.problems || []).map(p => h("div", { class: "small" }, "• " + p)));
+    $(msg).className = "msg " + (r.skipped ? "err" : "ok"); after(); }
+  catch (e) { say($(msg), e.message, "err"); }
+}
+$("#simp").onclick = () => upload("#sfile", "/api/admin/master/students/import", "#simsg", () => openMaster("students"));
+$("#timp").onclick = () => upload("#tfile", "/api/admin/master/teachers/import", "#timsg", () => openMaster("teachers"));
+
+// ---------------- co-curricula (view only)
+async function loadClasses() {
+  const list = await api("/api/classes");
+  $("#cls").replaceChildren(...(list.length ? list.map(c => h("tr", {}, h("td", {}, h("a", { href: "#class/" + c.id }, h("b", {}, c.name))), h("td", {}, catPill(c.category)),
+    h("td", { class: "small" }, c.teachers || pill("warn", "none yet")), h("td", { class: "num" }, String(c.students)), h("td", { class: "num" }, String(c.sessions)),
+    h("td", {}, h("a", { href: "#class/" + c.id, class: "btn ghost" }, "View"))))
+    : [empty(6, "Nothing yet. Upload the student list: its co-curricula appear here.")]));
+}
+async function loadClass(id) {
+  const c = await api(`/api/classes/${id}`);
+  $("#ctitle").textContent = c.name; $("#ctype").replaceChildren(catPill(c.category));
+  $("#cteachers").replaceChildren(...(c.teachers.length ? c.teachers.map(t => h("span", { class: "chip" }, t.name, t.position ? h("span", { class: "note" }, " · " + t.position) : ""))
+    : [pill("warn", "No teacher in charge yet")]));
+  $("#csessions").textContent = c.sessions.length ? `${c.sessions.length} sessions, the latest on ${fmtDate(c.sessions[0].session_date)} (${c.sessions[0].title}).` : "No sessions yet.";
+  const reg = c.students.filter(s => s.qr_status !== "unregistered").length;
+  $("#ccount").textContent = `${c.students.length} members · ${reg} registered · ${c.students.length - reg} not registered yet`;
+  $("#cstu").replaceChildren(...(c.students.length ? c.students.map(s => h("tr", {}, h("td", {}, avatar(s)), h("td", {}, s.name), h("td", {}, s.student_no), h("td", {}, s.class_name), h("td", {}, QR_LABEL(s))))
+    : [empty(5, "No members.")]));
+}
+
+// ---------------- achievements (view only)
+let achs = [];
+async function loadAch() { achs = await api("/api/admin/achievements"); renderAch(); }
+function renderAch() {
+  const q = $("#aq").value.toLowerCase();
+  const rows = achs.filter(a => [a.year, a.student_no, a.name, a.class_name, a.activity, a.level, a.award, a.added_by].join(" ").toLowerCase().includes(q));
+  $("#acount").textContent = `${achs.length} achievements · showing ${Math.min(rows.length, 500)}`;
+  $("#alist").replaceChildren(...(rows.length ? rows.slice(0, 500).map(a => h("tr", {}, h("td", { class: "num" }, String(a.year)),
+    h("td", {}, a.name, h("div", { class: "note" }, a.student_no)), h("td", {}, a.class_name), h("td", {}, a.activity), h("td", {}, levelPill(a.level)),
+    h("td", {}, h("b", {}, a.award)), h("td", { class: "small" }, a.added_by || "")))
+    : [empty(7, achs.length ? "No match." : "No achievements yet. Teachers record them for their co-curricula.")]));
+}
+$("#aq").oninput = renderAch;
+
+// ---------------- report: overall only
+let reportReady = false;
+async function openReport() {
+  if (!reportReady) { const t = new Date(); $("#rfrom").value = `${t.getFullYear()}-01-01`; $("#rto").value = isoDate(t);
+    ["#rfrom", "#rto"].forEach(s => $(s).onchange = renderReport); reportReady = true; }
+  await renderReport();
+}
+async function renderReport() {
+  say($("#rmsg"), "");
+  let r;
+  try { r = await api(`/api/reports/classes?start=${$("#rfrom").value}&end=${$("#rto").value}`); }
+  catch (e) { return say($("#rmsg"), e.message, "err"); }
+  const o = r.overall;
+  $("#rstats").replaceChildren(...[[o.percent == null ? "–" : Math.round(o.percent) + "%", "overall attendance"], [o.sessions, "sessions held"],
+    [r.classes.length, "co-curricula"], [o.below_75, "below 75%"]].map(([v, k]) => h("div", {}, h("b", {}, String(v)), k)));
+  $("#rlist").replaceChildren(...(r.classes.length ? r.classes.map(c => h("tr", { class: c.percent != null && c.percent < 75 ? "low" : "" },
+    h("td", {}, h("b", {}, c.name)), h("td", {}, catPill(c.category)), h("td", { class: "small" }, c.teachers || ""),
+    h("td", { class: "num" }, String(c.students + c.unregistered)), h("td", { class: "num" }, String(c.sessions)), h("td", {}, bar(c.percent))))
+    : [empty(6, "Nothing yet.")]));
+}
+
+// ---------------- activity log
+const ACTION = {
+  "master.import": "Uploaded master list", "achievement.add": "Recorded achievement", "achievement.remove": "Removed achievement",
+  "teacher.register": "Teacher registered", "student.register": "Student registered", "student.register_again": "Student registered again",
+  "student.qr_printed": "Printed QR", "student.reset_code": "Gave reset code", "qr.terminate": "Terminated QR",
+  "password.change": "Changed own password", "password.reset_with_code": "Reset password with code", "photo.change": "Changed photo", "photo.remove": "Removed photo",
+  "session.create": "Created session", "session.edit": "Edited session", "session.close": "Closed session", "session.reopen": "Reopened session",
+  "session.delete": "Deleted session", "session.export": "Exported session CSV", "report.export": "Exported report",
+  "attendance.check_in": "Checked in", "attendance.undo": "Undid check-in",
+  "backup.create": "Made backup", "backup.download": "Downloaded backup",
+  // from older versions
+  "master.add": "Added to master list", "master.edit": "Edited master list", "master.remove": "Removed from master list", "achievement.import": "Imported achievements",
+  "teacher.create": "Registered teacher", "teacher.signup": "Teacher signed up", "teacher.approve": "Approved teacher", "teacher.reject": "Rejected sign-up",
+  "user.set_password": "Set password", "user.disable": "Disabled account", "user.enable": "Enabled account",
+  "class.create": "Created group", "class.delete": "Deleted", "class.add_teacher": "Added teacher in charge", "class.remove_teacher": "Removed teacher in charge",
+  "class.add_student": "Added student to group", "class.remove_student": "Removed student from group",
+};
+const RED = /delete|remove|terminate|disable|reject|undo/;
+let logRows = [], logTimer = null;
+async function loadLog(more = false) {
+  const before = more && logRows.length ? logRows[logRows.length - 1].id : 0;
+  const page = await api(`/api/admin/audit?limit=100&q=${encodeURIComponent($("#lq").value.trim())}${before ? "&before=" + before : ""}`);
+  logRows = more ? logRows.concat(page) : page;
+  $("#lmore").hidden = page.length < 100;
+  $("#log").replaceChildren(...(logRows.length ? logRows.map(e => h("tr", {}, h("td", { class: "num small" }, fmtDateTime(e.at)), h("td", {}, e.actor),
+    h("td", {}, pill(RED.test(e.action) ? "absent" : /register|check_in/.test(e.action) ? "present" : "", ACTION[e.action] || e.action)),
+    h("td", {}, e.target), h("td", { class: "small" }, e.detail))) : [empty(5, "Nothing yet.")]));
+}
+$("#lq").oninput = () => { clearTimeout(logTimer); logTimer = setTimeout(() => loadLog(), 250); };
+$("#lmore").onclick = () => loadLog(true);
+
+requireRole("admin").then(route);
+</script></html>

@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    user: "${ATT_UID:-1000}:${ATT_GID:-1000}"   # must own ./data (run `id -u` and `id -g` on the server)
+    environment:
+      TZ: ${TZ:-Asia/Kuala_Lumpur}
+    volumes:
+      - ./data:/data               # database and backups live here: copy this folder off-site
+    ports:
+      - "${ATT_PORT:-8000}:8000"   # plain HTTP for LAN use; use the https profile for camera scanning off-localhost
+
+  # Optional: automatic HTTPS when the school has a domain. Run with:  docker compose --profile https up -d
+  caddy:
+    profiles: ["https"]
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [app]
+
+volumes:
+  caddy_data:

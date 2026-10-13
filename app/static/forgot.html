@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Attendance · Forgot password</title><link rel="stylesheet" href="/static/style.css">
+<body class="auth">
+<main class="auth-stage">
+ <div class="auth-backdrop" aria-hidden="true">
+  <img class="auth-crest" data-school-logo alt="">
+  <div class="auth-marquee top"><span data-school="name"></span><span data-school="name"></span><span data-school="name"></span><span data-school="name"></span></div>
+  <div class="auth-marquee bottom"><span data-school="motto"></span><span data-school="motto"></span><span data-school="motto"></span><span data-school="motto"></span></div>
+ </div>
+ <div class="auth-card wide">
+  <div class="auth-brand"><img data-school-logo alt="School crest"><div><b data-school="name"></b><small data-school="motto"></small></div></div>
+  <p class="auth-portal"><span class="logo" aria-hidden="true"></span><span>QR Attendance · <span id="portalName"></span></span></p>
+  <h2 class="auth-title">Forgot password</h2>
+  <ul class="auth-lead" style="padding-left:20px">
+   <li id="for-staff">The 6-digit code is sent to your email. It works once, for 30 minutes.</li>
+   <li id="for-student">Your request appears on your teacher's list. Ask your teacher or the admin for the 6-digit code in person.</li>
+  </ul>
+  <h3 class="auth-step">Step 1 · Ask for a code</h3>
+  <form id="f1" class="form">
+   <div><label for="id" id="idlabel">Username or email</label><input id="id" autocapitalize="none" required></div>
+   <button id="go1">Request reset code &rarr;</button>
+   <div id="m1" class="msg" role="status"></div>
+  </form>
+  <h3 class="auth-step">Step 2 · Choose a new password</h3>
+  <form id="f2" class="form">
+   <div><label for="id2" id="idlabel2">Username or email</label><input id="id2" autocapitalize="none" required></div>
+   <div><label for="code">6-digit reset code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required></div>
+   <div><label for="pw">New password (8 or more characters)</label><input id="pw" type="password" autocomplete="new-password" minlength="8" required></div>
+   <div><label for="pw2">New password again</label><input id="pw2" type="password" autocomplete="new-password" required></div>
+   <button id="go2">Save new password &rarr;</button>
+   <div id="m2" class="msg" role="alert"></div>
+  </form>
+  <p class="links"><a id="back" href="/">Back to log in</a></p>
+ </div>
+</main>
+<script src="/static/app.js"></script>
+<script>
+$("#back").href = "/" + PORTAL; $("#portalName").textContent = ROLE_NAME[PORTAL] + " portal";
+$("#" + (PORTAL === "student" ? "for-staff" : "for-student")).hidden = true;
+if (PORTAL !== "admin") { $("#idlabel").textContent = $("#idlabel2").textContent = PORTAL === "student" ? "Student ID" : "Teacher ID or email"; }
+$("#id").oninput = () => { $("#id2").value = $("#id").value; };
+$("#f1").onsubmit = async e => {
+  e.preventDefault(); $("#go1").disabled = true;
+  try { const r = await api("/api/forgot-password", { method: "POST", body: { identifier: $("#id").value.trim() } }); say($("#m1"), r.message, "ok"); $("#code").focus(); }
+  catch (err) { say($("#m1"), err.message, "err"); } finally { $("#go1").disabled = false; }
+};
+$("#f2").onsubmit = async e => {
+  e.preventDefault();
+  if ($("#pw").value !== $("#pw2").value) return say($("#m2"), "The two passwords are not the same.", "err");
+  try { await api("/api/reset-password", { method: "POST", body: { identifier: $("#id2").value.trim(), code: $("#code").value.trim(), password: $("#pw").value } });
+    $("#f2").replaceChildren(h("p", { class: "msg ok" }, "Password changed. "), h("a", { href: "/" + PORTAL }, "Log in now")); }
+  catch (err) { say($("#m2"), err.message, "err"); }
+};
+</script></html>

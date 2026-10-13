@@ -1,0 +1,5 @@
+# Replace with your real (sub)domain, e.g. attendance.myschool.edu.my. Caddy gets the certificate by itself.
+attendance.example.edu.my {
+	encode gzip
+	reverse_proxy app:8000
+}

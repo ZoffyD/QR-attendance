@@ -1,0 +1,156 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Attendance · Student</title><link rel="stylesheet" href="/static/style.css">
+<style>
+.qr-area{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:28px;align-items:center}
+#qrcard{padding:22px 22px 16px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#000;text-align:center}
+#qrcard svg{display:block;width:230px;height:auto;margin:0 auto 10px}
+#qrcard .nm{font-size:17px;font-weight:800;text-transform:uppercase}
+.issued{display:grid;place-items:center;width:200px;height:200px;border:2px dashed var(--line2);border-radius:12px;color:var(--dim);font-weight:800;letter-spacing:.14em;text-transform:uppercase;text-align:center}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+@media (max-width:700px){.qr-area{grid-template-columns:1fr;justify-items:center}}
+@media print{
+  body *{visibility:hidden}
+  #qrcard,#qrcard *{visibility:visible}
+  #qrcard{position:absolute;left:0;top:0;width:330px;border:1px dashed #888}
+}
+</style>
+<body>
+<header><h1><img data-school-logo alt=""><span><span data-school="name"></span><small>Student portal</small></span></h1>
+ <div class="hdr-user" id="whoami"></div>
+ <div class="hdr-actions"><button class="ghost" id="cpwBtn">Change password</button><button class="ghost" id="logout">Log out</button></div></header>
+<main>
+<nav class="tabbar" id="nav" aria-label="Pages"></nav>
+
+<!-- ============ 1. profile ============ -->
+<div id="tab-profile" hidden>
+<section>
+ <div class="profile-card">
+  <div><div id="pphoto"></div>
+   <div class="photo-tools"><button class="ghost" id="photoBtn">Upload photo</button><button class="ghost" id="photoDel" hidden>Remove</button></div></div>
+  <div class="who">
+   <p class="page-label">Student profile</p>
+   <h2 class="name" id="pname"></h2>
+   <p class="sub" id="psub"></p>
+   <dl class="profile"><dt>Student ID</dt><dd id="pno"></dd><dt>Class ID</dt><dd id="pcls"></dd><dt>Registered</dt><dd id="preg"></dd></dl>
+  </div>
+ </div>
+ <div id="phmsg" class="msg" role="status"></div>
+</section>
+<section><h2>My co-curricula</h2>
+ <p class="note">From the school's records. If one is wrong, tell your teacher.</p>
+ <div class="cards" id="cocu"></div>
+</section>
+<section><h2>My QR code</h2>
+ <div class="qr-area">
+  <div>
+   <div id="qrNew" hidden>
+    <p>Your personal QR can be shown and printed <b>only once</b>, so nobody can copy it to scan for you. Have a printer ready, or save the image, before you leave this page.</p>
+    <div class="btns"><button id="getqr">Show and print my QR (one time only)</button></div>
+   </div>
+   <div id="qrShownCopy" hidden>
+    <p><b>This is the only time your QR is shown.</b> Print it or save it now.</p>
+    <div class="btns noprint"><button id="prt">Print</button><button id="save" class="ghost">Save image</button></div>
+   </div>
+   <div id="qrDone" hidden>
+    <p>Printed on <b id="printed"></b>. Bring it to every activity. Lost it? Tell your teacher: they terminate the old QR, then you register again. Your history is kept.</p>
+   </div>
+   <div id="qmsg" class="msg" role="alert"></div>
+  </div>
+  <div><div id="qrShown" hidden><div id="qrcard"></div></div><div id="qrSeal" class="issued" hidden>QR issued</div></div>
+ </div>
+</section>
+</div>
+
+<!-- ============ 2. attendance ============ -->
+<div id="tab-attendance" hidden>
+<section><h2>Attendance by co-curriculum</h2>
+ <p class="note">Sessions held so far, and how many you attended.</p>
+ <div class="scroll"><table><thead><tr><th>Co-curriculum</th><th>Type</th><th>Attended</th><th>Attendance</th></tr></thead><tbody id="sum"></tbody></table></div>
+</section>
+<section><h2>Sessions attended</h2>
+ <div class="scroll"><table><thead><tr><th>Session</th><th>Co-curriculum</th><th>Venue</th><th>Scheduled</th><th>Checked in at</th></tr></thead><tbody id="rows"></tbody></table></div>
+</section>
+</div>
+
+<!-- ============ 3. achievements ============ -->
+<section id="tab-achievements" hidden><h2>My achievements</h2>
+ <p class="note">Recorded by your co-curriculum teachers.</p>
+ <div class="scroll"><table><thead><tr><th>Year</th><th>Activity</th><th>Level</th><th>Award</th></tr></thead><tbody id="ach"></tbody></table></div>
+</section>
+</main>
+<script src="/static/app.js"></script>
+<script>
+const TABS = [["profile", "Profile"], ["attendance", "Attendance"], ["achievements", "Achievements"]];
+let me = null, qr = null;
+function route() {
+  const tab = TABS.some(([k]) => k === location.hash.slice(1)) ? location.hash.slice(1) : "profile";
+  TABS.forEach(([k]) => $("#tab-" + k).hidden = k !== tab);
+  tabBar($("#nav"), TABS, tab, k => location.hash = k);
+  ({ profile: loadProfile, attendance: loadAttendance, achievements: loadAchievements })[tab]();
+}
+addEventListener("hashchange", route);
+
+async function loadProfile() {
+  me = await api("/api/student/me");
+  $("#pphoto").replaceChildren(avatar(me, "lg"));
+  $("#photoBtn").textContent = me.has_photo ? "Change photo" : "Upload photo"; $("#photoDel").hidden = !me.has_photo;
+  $("#pname").textContent = me.name;
+  $("#psub").textContent = `Class ${me.class_name || "—"}`;
+  $("#pno").textContent = me.student_no; $("#pcls").textContent = me.class_name || "—"; $("#preg").textContent = fmtDateTime(me.registered_at);
+  $("#cocu").replaceChildren(...me.cocurricula.map(c => h("div", { class: "card" }, h("div", { class: "k" }, c.category),
+    h("div", { class: "v" + (c.name ? "" : " none") }, c.name || "Not recorded"),
+    h("div", { class: "d" }, c.name ? (c.teachers ? "Teacher: " + c.teachers : "Teacher to be announced") : "Ask your teacher if this is wrong"))));
+  if (!qr) showQrState(me.qr_printed_at);
+}
+async function changedPhoto(err) {
+  if (err) return say($("#phmsg"), err.message, "err");
+  forgetPhoto(me.id); say($("#phmsg"), "Photo saved.", "ok"); await loadProfile(); setupHeader(await api("/api/me"));
+}
+$("#photoBtn").onclick = () => choosePhoto(changedPhoto);
+$("#photoDel").onclick = async () => { if (!confirm("Remove your photo?")) return; await api("/api/me/photo", { method: "DELETE" }); changedPhoto(null); };
+
+async function loadAttendance() {
+  const [sum, att] = await Promise.all([api("/api/student/attendance/summary"), api("/api/student/attendance")]);
+  $("#sum").replaceChildren(...(sum.length ? sum.map(c => h("tr", {}, h("td", {}, h("b", {}, c.name)), h("td", {}, catPill(c.category)),
+    h("td", { class: "num" }, `${c.attended} / ${c.held}`), h("td", {}, bar(c.percent))))
+    : [empty(4, "You are not in any co-curriculum yet.")]));
+  $("#rows").replaceChildren(...(att.length ? att.map(a => h("tr", {}, h("td", {}, h("b", {}, a.title)), h("td", {}, a.classes || ""), h("td", {}, a.venue),
+    h("td", { class: "num" }, fmtDate(a.session_date) + (a.start_time ? " · " + timeRange(a) : "")), h("td", { class: "num" }, fmtDateTime(a.checked_in_at))))
+    : [empty(5, "Nothing yet. Your attendance appears here after a teacher scans your QR.")]));
+}
+async function loadAchievements() {
+  me = await api("/api/student/me");
+  $("#ach").replaceChildren(...(me.achievements.length ? me.achievements.map(a => h("tr", {}, h("td", { class: "num" }, String(a.year)),
+    h("td", {}, h("b", {}, a.activity)), h("td", {}, levelPill(a.level)), h("td", {}, a.award)))
+    : [empty(4, "No achievements recorded yet.")]));
+}
+
+// ---------------- the QR: shown and printed once
+function showQrState(printedAt) {
+  $("#qrNew").hidden = !!printedAt; $("#qrDone").hidden = $("#qrSeal").hidden = !printedAt;
+  $("#printed").textContent = fmtDateTime(printedAt);
+}
+$("#getqr").onclick = async () => {
+  if (!confirm("Your QR can be shown and printed only ONCE. Is your printer ready?")) return;
+  try {
+    qr = await api("/api/student/qr", { method: "POST" });
+    $("#qrcard").innerHTML = qr.qr_svg;
+    $("#qrcard").append(h("div", { class: "nm" }, qr.name), h("div", {}, `Student ID ${qr.student_no}` + (qr.class_name ? ` · ${qr.class_name}` : "")));
+    $("#qrNew").hidden = true; $("#qrShown").hidden = $("#qrShownCopy").hidden = false;
+    addEventListener("beforeunload", e => { e.preventDefault(); e.returnValue = ""; });
+  } catch (e) { say($("#qmsg"), e.message, "err"); loadProfile(); }
+};
+$("#prt").onclick = () => print();
+$("#save").onclick = () => {
+  const svg = $("#qrcard svg"), img = new Image(), S = 600, pad = 40;
+  img.onload = () => {
+    const c = h("canvas", { width: S, height: S + 100 }), x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, pad, pad, S - 2 * pad, S - 2 * pad);
+    x.fillStyle = "#000"; x.textAlign = "center"; x.font = "bold 30px system-ui,sans-serif"; x.fillText(qr.name, S / 2, S + 15);
+    x.font = "24px system-ui,sans-serif"; x.fillText(`Student ID ${qr.student_no}` + (qr.class_name ? ` · ${qr.class_name}` : ""), S / 2, S + 55);
+    c.toBlob(b => download(b, `qr-${qr.student_no}.png`));
+  };
+  img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))));
+};
+requireRole("student").then(route);
+</script></html>
